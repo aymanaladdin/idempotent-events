@@ -1,4 +1,3 @@
-import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
@@ -7,7 +6,6 @@ import {
   IsNumber,
   IsString,
   Min,
-  ValidateNested,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -60,13 +58,11 @@ export class TransferEventDto {
 
 export class CreateTransfersDto {
   @ApiProperty({
-    description: 'Batch of transfer events to ingest — must contain at least one event',
+    description: 'Batch of transfer events to ingest — must contain at least one event. Each event is validated individually; invalid entries are returned in rejected[] without blocking valid ones.',
     type: [TransferEventDto],
     required: true,
   })
   @IsArray()
   @ArrayMinSize(1)
-  @ValidateNested({ each: true })
-  @Type(() => TransferEventDto)
-  events: TransferEventDto[];
+  events: Record<string, unknown>[];
 }

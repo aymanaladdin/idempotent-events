@@ -81,29 +81,65 @@ describe('POST /transfers', () => {
     expect(res.body.duplicates).toBe(1);
   });
 
-  it('rejects request with missing required fields', async () => {
+  it('returns invalid events in rejected[] without blocking valid ones', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/transfers')
+      .set(authHeader)
+      .send({
+        events: [
+          validEvent(),
+          { amount: -1, status: 'approved' },
+          validEvent(),
+        ],
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.inserted).toBe(2);
+    expect(res.body.rejected).toHaveLength(1);
+    expect(res.body.rejected[0].index).toBe(1);
+    expect(res.body.rejected[0].reason).toBeTruthy();
+  });
+
+  it('rejects event with missing required fields into rejected[]', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/transfers')
       .set(authHeader)
       .send({ events: [{ amount: 100, status: 'approved' }] });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(201);
+    expect(res.body.inserted).toBe(0);
+    expect(res.body.rejected).toHaveLength(1);
+    expect(res.body.rejected[0].index).toBe(0);
+    expect(res.body.rejected[0].reason).toBeTruthy();
   });
 
-  it('rejects negative amount', async () => {
+  it('rejects event with negative amount into rejected[]', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/transfers')
       .set(authHeader)
       .send({ events: [validEvent({ amount: -1 })] });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(201);
+    expect(res.body.rejected).toHaveLength(1);
+    expect(res.body.rejected[0].index).toBe(0);
   });
 
-  it('rejects invalid created_at format', async () => {
+  it('rejects event with invalid created_at into rejected[]', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/transfers')
       .set(authHeader)
       .send({ events: [validEvent({ created_at: 'not-a-date' })] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.rejected).toHaveLength(1);
+    expect(res.body.rejected[0].index).toBe(0);
+  });
+
+  it('returns 400 if events field is missing entirely', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/transfers')
+      .set(authHeader)
+      .send({});
 
     expect(res.status).toBe(400);
   });

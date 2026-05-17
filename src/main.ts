@@ -16,10 +16,12 @@ async function bootstrap() {
   });
   app.enableVersioning({ type: VersioningType.URI });
 
+  app.enableShutdownHooks();
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: false,
+      forbidNonWhitelisted: true,
       transform: true,
     }),
   );

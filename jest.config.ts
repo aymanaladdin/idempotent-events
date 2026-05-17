@@ -5,7 +5,7 @@ const config: Config = {
   rootDir: '.',
   roots: ['<rootDir>/src', '<rootDir>/test'],
   testRegex: '.*\\.spec\\.ts$',
-  transform: { '^.+\\.(t|j)s$': 'ts-jest' },
+  transform: { '^.+\\.ts$': 'ts-jest' },
   collectCoverageFrom: ['src/**/*.(t|j)s'],
   coverageDirectory: 'coverage',
   testEnvironment: 'node',

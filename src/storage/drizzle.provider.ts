@@ -13,7 +13,7 @@ export const drizzleProvider = {
   inject: [ConfigService],
   useFactory: (config: ConfigService) => {
     const pool = new Pool({
-      connectionString: config.get<AppConfig>('app').databaseUrl,
+      connectionString: config.getOrThrow<AppConfig>('app').databaseUrl,
     });
     return drizzle(pool, { schema });
   },

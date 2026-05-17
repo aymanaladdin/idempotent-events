@@ -1,4 +1,4 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { AppModule } from '../../src/app.module';
 
@@ -8,7 +8,13 @@ export async function createTestApp(): Promise<INestApplication> {
   }).compile();
 
   const app = moduleRef.createNestApplication();
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
+  app.setGlobalPrefix('api', {
+    exclude: ['/ui/dashboard', '/reference', '/health', '/health/live', '/health/ready'],
+  });
+  app.enableVersioning({ type: VersioningType.URI });
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: false, transform: true }));
+
   await app.init();
   return app;
 }

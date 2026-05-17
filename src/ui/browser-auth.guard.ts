@@ -20,7 +20,7 @@ export class BrowserAuthGuard implements CanActivate {
       const [user, ...passParts] = decoded.split(':');
       const pass = passParts.join(':');
 
-      const cfg = this.config.get<AppConfig>('app');
+      const cfg = this.config.getOrThrow<AppConfig>('app');
       if (user === cfg.basicAuthUser && pass === cfg.basicAuthPass) {
         return true;
       }

@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsDateString,
@@ -64,5 +65,6 @@ export class CreateTransfersDto {
   })
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(1000)
   events: Record<string, unknown>[];
 }

@@ -237,6 +237,7 @@ This approach is chosen over fail-fast because it makes the endpoint safe to con
 - `amount` — required, must be a non-negative number
 - `created_at` — must be a valid ISO 8601 date string
 - `status` — any string is accepted; unknown values are stored but do not count toward `total_approved_amount`
+- Batch size: minimum 1, maximum 1000 events per request
 
 ### events_count Semantics
 

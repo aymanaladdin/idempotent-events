@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { appConfig } from './config/app.config';
 import { validate } from './config/env.validation';
 import { HealthModule } from './health/health.module';
+import { UiModule } from './ui/ui.module';
 import { StorageModule } from './storage/storage.module';
 import { TransfersModule } from './transfers/transfers.module';
 import { StationsModule } from './stations/stations.module';
@@ -14,6 +15,7 @@ import { StationsModule } from './stations/stations.module';
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     StorageModule,
     HealthModule,
+    UiModule,
     TransfersModule,
     StationsModule,
   ],

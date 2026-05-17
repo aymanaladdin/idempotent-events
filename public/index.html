@@ -107,7 +107,7 @@
                   <div class="text-xs font-mono text-red-300">
                     [<span x-text="r.index"></span>]
                     <span class="text-red-400" x-text="r.event_id ? r.event_id + ' — ' : ''"></span>
-                    <span x-text="r.errors?.join(', ') ?? r.reason ?? JSON.stringify(r)"></span>
+                    <span x-text="r.errors?.join(', ') ?? JSON.stringify(r)"></span>
                   </div>
                 </template>
               </div>

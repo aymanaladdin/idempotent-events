@@ -15,7 +15,7 @@ export interface InsertResult {
 export interface RejectedEvent {
   index: number;
   event_id: string;
-  reason: string;
+  errors: string[];
 }
 
 export interface StationSummary {

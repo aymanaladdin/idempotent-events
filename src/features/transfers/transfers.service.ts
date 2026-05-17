@@ -27,13 +27,10 @@ export class TransfersService {
       const errors = validateSync(eventDto, { skipMissingProperties: false });
 
       if (errors.length > 0) {
-        const reason = errors
-          .flatMap((validationError) => Object.values(validationError.constraints ?? {}))
-          .join('; ');
         rejectedEvents.push({
           index: i,
           event_id: typeof rawEventData['event_id'] === 'string' ? rawEventData['event_id'] : `index-${i}`,
-          reason,
+          errors: errors.flatMap((validationError) => Object.values(validationError.constraints ?? {})),
         });
       } else {
         validEvents.push({

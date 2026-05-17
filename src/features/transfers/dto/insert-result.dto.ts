@@ -17,11 +17,13 @@ export class RejectedEventDto {
   event_id: string;
 
   @ApiProperty({
-    description: 'Human-readable reason for rejection',
-    example: REJECTED_EVENT_EXAMPLE.reason,
+    description: 'Validation error messages for this event',
+    example: REJECTED_EVENT_EXAMPLE.errors,
+    isArray: true,
+    type: String,
     required: true,
   })
-  reason: string;
+  errors: string[];
 }
 
 export class InsertResultDto {

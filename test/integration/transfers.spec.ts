@@ -98,7 +98,7 @@ describe('Transfer ingestion', () => {
       expect(response.body.inserted).toBe(2);
       expect(response.body.rejected).toHaveLength(1);
       expect(response.body.rejected[0].index).toBe(1);
-      expect(response.body.rejected[0].reason).toBeTruthy();
+      expect(response.body.rejected[0].errors).toEqual(expect.arrayContaining([expect.any(String)]));
     });
 
     it('rejects events with missing required fields into rejected[]', async () => {
@@ -108,7 +108,7 @@ describe('Transfer ingestion', () => {
       expect(response.body.inserted).toBe(0);
       expect(response.body.rejected).toHaveLength(1);
       expect(response.body.rejected[0].index).toBe(0);
-      expect(response.body.rejected[0].reason).toBeTruthy();
+      expect(response.body.rejected[0].errors).toEqual(expect.arrayContaining([expect.any(String)]));
     });
 
     it('rejects events with negative amount into rejected[]', async () => {

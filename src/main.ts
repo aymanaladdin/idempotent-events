@@ -1,8 +1,10 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { AppConfig } from './config/app.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -15,7 +17,7 @@ async function bootstrap() {
     }),
   );
 
-  const config = new DocumentBuilder()
+  const swaggerConfig = new DocumentBuilder()
     .setTitle('Idempotent Events API')
     .setDescription('Station transfer event ingestion with idempotency guarantees')
     .setVersion('1.0')
@@ -23,12 +25,9 @@ async function bootstrap() {
     .addApiKey({ type: 'apiKey', name: 'x-api-key', in: 'header' }, 'x-api-key')
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.createDocument(app, swaggerConfig);
 
-  app.useStaticAssets('public');
-
-  const port = process.env.PORT ?? 3000;
+  const port = app.get(ConfigService).get<AppConfig>('app').port;
   await app.listen(port);
 }
 

@@ -1,7 +1,8 @@
-import { Controller, Get, Inject } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Inject, UseGuards } from '@nestjs/common';
+import { ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { HealthCheck, HealthCheckService, HealthIndicatorResult } from '@nestjs/terminus';
 import { sql } from 'drizzle-orm';
+import { AuthGuard } from '../common/auth.guard';
 import { DRIZZLE, DrizzleDb } from '../storage/drizzle.provider';
 
 @ApiTags('health')
@@ -27,7 +28,9 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
-  @ApiOperation({ summary: 'Combined health check' })
+  @UseGuards(AuthGuard)
+  @ApiSecurity('x-api-key')
+  @ApiOperation({ summary: 'Combined health check — requires auth' })
   check() {
     return this.health.check([() => this.checkDb()]);
   }

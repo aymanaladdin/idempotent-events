@@ -1,8 +1,9 @@
-import { pgTable, text, numeric, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, numeric, timestamp, uniqueIndex, bigserial } from 'drizzle-orm/pg-core';
 
 export const transferEvents = pgTable(
   'transfer_events',
   {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
     event_id: text('event_id').notNull(),
     station_id: text('station_id').notNull(),
     amount: numeric('amount', { precision: 20, scale: 4 }).notNull(),

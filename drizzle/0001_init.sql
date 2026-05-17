@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS "transfer_events" (
+  "id"         bigserial   PRIMARY KEY,
   "event_id"   text        NOT NULL,
   "station_id" text        NOT NULL,
   "amount"     numeric(20, 4) NOT NULL,

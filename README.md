@@ -7,9 +7,9 @@ Station transfer event ingestion API with idempotency and concurrency safety gua
 - **Runtime:** Node.js 20
 - **Framework:** NestJS + TypeScript
 - **Database:** PostgreSQL 16 via Drizzle ORM
-- **Auth:** Basic Auth or `x-api-key` header
-- **Docs:** Swagger UI at `/api`
-- **Demo UI:** Alpine.js at `/`
+- **Auth:** Basic Auth or `x-api-key` header (API routes) / Browser Basic Auth (UI)
+- **API Docs:** Scalar at `/reference`
+- **Demo UI:** Alpine.js at `/ui/dashboard` (browser basic auth protected)
 
 ## Requirements
 
@@ -34,10 +34,13 @@ docker compose up --build
 ```
 
 Services:
-- **App:** http://localhost:3000
-- **Swagger UI:** http://localhost:3000/api
-- **Demo UI:** http://localhost:3000
-- **pgAdmin:** http://localhost:5050 (admin@admin.com / admin)
+| URL | Service |
+|---|---|
+| http://localhost:3000/ui/dashboard | Demo UI (login: admin / secret) |
+| http://localhost:3000/reference | Scalar API reference |
+| http://localhost:3000/health/live | Liveness probe |
+| http://localhost:3000/health/ready | Readiness probe (checks DB) |
+| http://localhost:5050 | pgAdmin (admin@admin.com / admin) |
 
 ## Run Tests
 
@@ -49,12 +52,25 @@ make test
 make docker-test
 ```
 
+## API Routes
+
+All API routes are prefixed with `/api/v1`.
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/v1/transfers` | Batch ingest transfer events |
+| `GET` | `/api/v1/stations/:id/summary` | Reconciliation summary per station |
+| `GET` | `/health/live` | Liveness probe |
+| `GET` | `/health/ready` | Readiness probe |
+| `GET` | `/reference` | Scalar API docs |
+| `GET` | `/ui/dashboard` | Demo UI |
+
 ## API Examples
 
-### POST /transfers — Batch ingest events
+### POST /api/v1/transfers — Batch ingest events
 
 ```bash
-curl -X POST http://localhost:3000/transfers \
+curl -X POST http://localhost:3000/api/v1/transfers \
   -H "Content-Type: application/json" \
   -H "x-api-key: change-me-in-production" \
   -d '{
@@ -86,10 +102,10 @@ Response:
 }
 ```
 
-### GET /stations/:station_id/summary — Reconciliation summary
+### GET /api/v1/stations/:station_id/summary — Reconciliation summary
 
 ```bash
-curl http://localhost:3000/stations/station-42/summary \
+curl http://localhost:3000/api/v1/stations/station-42/summary \
   -H "x-api-key: change-me-in-production"
 ```
 
@@ -109,7 +125,14 @@ Response:
 ### Basic Auth
 
 ```bash
-curl -u admin:secret http://localhost:3000/stations/station-42/summary
+curl -u admin:secret http://localhost:3000/api/v1/stations/station-42/summary
+```
+
+### Health checks
+
+```bash
+curl http://localhost:3000/health/live   # always 200
+curl http://localhost:3000/health/ready  # 200 when DB up, 503 when down
 ```
 
 ## Design Notes
@@ -139,6 +162,10 @@ This approach is chosen over fail-fast because it makes the endpoint safe to con
 ### events_count Semantics
 
 `events_count` reflects **all stored events** for the station regardless of status. `total_approved_amount` sums only `status = 'approved'` events. This gives a complete audit picture and allows deriving the approval rate.
+
+### API Versioning
+
+All API endpoints are versioned via URI prefix (`/api/v1/...`). The global `/api` prefix and `v1` version are configured in `main.ts`. The `/ui/dashboard`, `/reference`, and `/health*` routes are intentionally excluded from the global prefix.
 
 ### Tradeoffs & Future Layers
 

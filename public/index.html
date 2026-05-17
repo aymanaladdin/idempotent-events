@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Idempotent Events — Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen font-mono p-6">
+
+<div x-data="app()" class="max-w-4xl mx-auto space-y-8">
+
+  <h1 class="text-2xl font-bold text-white">Idempotent Events — Demo</h1>
+
+  <!-- Auth -->
+  <section class="bg-gray-900 rounded-xl p-5 space-y-3">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-widest">Authentication</h2>
+    <div class="flex gap-3 flex-wrap">
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-gray-500">Method</label>
+        <select x-model="auth.method" class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-white">
+          <option value="apikey">x-api-key</option>
+          <option value="basic">Basic Auth</option>
+        </select>
+      </div>
+      <template x-if="auth.method === 'apikey'">
+        <div class="flex flex-col gap-1 flex-1 min-w-48">
+          <label class="text-xs text-gray-500">API Key</label>
+          <input x-model="auth.apiKey" class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-white w-full" placeholder="change-me-in-production" />
+        </div>
+      </template>
+      <template x-if="auth.method === 'basic'">
+        <div class="flex gap-2 flex-1">
+          <div class="flex flex-col gap-1 flex-1">
+            <label class="text-xs text-gray-500">Username</label>
+            <input x-model="auth.user" class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-white w-full" placeholder="admin" />
+          </div>
+          <div class="flex flex-col gap-1 flex-1">
+            <label class="text-xs text-gray-500">Password</label>
+            <input x-model="auth.pass" type="password" class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-white w-full" placeholder="secret" />
+          </div>
+        </div>
+      </template>
+    </div>
+  </section>
+
+  <!-- POST /transfers -->
+  <section class="bg-gray-900 rounded-xl p-5 space-y-4">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-widest">POST /transfers</h2>
+
+    <div class="space-y-2">
+      <label class="text-xs text-gray-500">Events JSON (array)</label>
+      <textarea
+        x-model="transfer.payload"
+        rows="10"
+        class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-green-300 font-mono resize-y"
+      ></textarea>
+    </div>
+
+    <div class="flex gap-3 items-center">
+      <button
+        @click="postTransfers()"
+        :disabled="transfer.loading"
+        class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm px-4 py-2 rounded font-semibold transition"
+      >
+        <span x-text="transfer.loading ? 'Sending…' : 'Send Batch'"></span>
+      </button>
+      <button @click="addDuplicate()" class="text-xs text-gray-500 hover:text-gray-300 transition">+ Add duplicate</button>
+      <button @click="resetPayload()" class="text-xs text-gray-500 hover:text-gray-300 transition">Reset</button>
+    </div>
+
+    <template x-if="transfer.result">
+      <div :class="transfer.error ? 'border-red-700 bg-red-950' : 'border-green-700 bg-green-950'" class="border rounded p-4 text-sm">
+        <div class="text-xs text-gray-400 mb-1" x-text="transfer.error ? 'Error' : 'Response'"></div>
+        <pre class="text-xs overflow-auto" x-text="JSON.stringify(transfer.result, null, 2)"></pre>
+      </div>
+    </template>
+  </section>
+
+  <!-- GET /stations/:id/summary -->
+  <section class="bg-gray-900 rounded-xl p-5 space-y-4">
+    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-widest">GET /stations/:station_id/summary</h2>
+
+    <div class="flex gap-3 items-end">
+      <div class="flex flex-col gap-1 flex-1">
+        <label class="text-xs text-gray-500">Station ID</label>
+        <input x-model="summary.stationId" class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-white" placeholder="station-42" />
+      </div>
+      <button
+        @click="getSummary()"
+        :disabled="summary.loading"
+        class="bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm px-4 py-2 rounded font-semibold transition"
+      >
+        <span x-text="summary.loading ? 'Loading…' : 'Get Summary'"></span>
+      </button>
+    </div>
+
+    <template x-if="summary.result">
+      <div :class="summary.error ? 'border-red-700 bg-red-950' : 'border-teal-700 bg-teal-950'" class="border rounded p-4">
+        <template x-if="!summary.error">
+          <div class="space-y-3">
+            <div class="grid grid-cols-3 gap-4">
+              <div class="bg-gray-900 rounded p-3 text-center">
+                <div class="text-xs text-gray-500 mb-1">Total Approved</div>
+                <div class="text-xl font-bold text-teal-400" x-text="'$' + Number(summary.result.total_approved_amount).toFixed(2)"></div>
+              </div>
+              <div class="bg-gray-900 rounded p-3 text-center">
+                <div class="text-xs text-gray-500 mb-1">Events Count</div>
+                <div class="text-xl font-bold text-white" x-text="summary.result.events_count"></div>
+              </div>
+              <div class="bg-gray-900 rounded p-3 text-center">
+                <div class="text-xs text-gray-500 mb-1">Station</div>
+                <div class="text-sm font-bold text-gray-300 break-all" x-text="summary.result.station_id"></div>
+              </div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500 mb-2">Events by Status</div>
+              <div class="flex flex-wrap gap-2">
+                <template x-for="[status, count] in Object.entries(summary.result.events_by_status || {})">
+                  <span class="bg-gray-800 border border-gray-700 rounded px-3 py-1 text-xs">
+                    <span class="text-gray-400" x-text="status"></span>
+                    <span class="text-white font-bold ml-2" x-text="count"></span>
+                  </span>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>
+        <template x-if="summary.error">
+          <pre class="text-xs text-red-300 overflow-auto" x-text="JSON.stringify(summary.result, null, 2)"></pre>
+        </template>
+      </div>
+    </template>
+  </section>
+
+</div>
+
+<script>
+function app() {
+  const defaultEvents = () => [
+    { event_id: 'evt-' + Math.random().toString(36).slice(2), station_id: 'station-42', amount: 100.5, status: 'approved', created_at: new Date().toISOString() },
+    { event_id: 'evt-' + Math.random().toString(36).slice(2), station_id: 'station-42', amount: 200, status: 'pending', created_at: new Date().toISOString() },
+  ];
+
+  return {
+    auth: { method: 'apikey', apiKey: 'change-me-in-production', user: 'admin', pass: 'secret' },
+
+    transfer: {
+      payload: JSON.stringify(defaultEvents(), null, 2),
+      loading: false,
+      result: null,
+      error: false,
+      lastInserted: [],
+    },
+
+    summary: {
+      stationId: 'station-42',
+      loading: false,
+      result: null,
+      error: false,
+    },
+
+    authHeaders() {
+      if (this.auth.method === 'apikey') {
+        return { 'Content-Type': 'application/json', 'x-api-key': this.auth.apiKey };
+      }
+      const b64 = btoa(`${this.auth.user}:${this.auth.pass}`);
+      return { 'Content-Type': 'application/json', Authorization: `Basic ${b64}` };
+    },
+
+    async postTransfers() {
+      this.transfer.loading = true;
+      this.transfer.result = null;
+      try {
+        const events = JSON.parse(this.transfer.payload);
+        const res = await fetch('/transfers', {
+          method: 'POST',
+          headers: this.authHeaders(),
+          body: JSON.stringify({ events }),
+        });
+        const body = await res.json();
+        this.transfer.result = body;
+        this.transfer.error = !res.ok;
+        if (res.ok) {
+          this.transfer.lastInserted = events;
+          this.summary.stationId = events[0]?.station_id ?? this.summary.stationId;
+        }
+      } catch (e) {
+        this.transfer.result = { error: e.message };
+        this.transfer.error = true;
+      } finally {
+        this.transfer.loading = false;
+      }
+    },
+
+    addDuplicate() {
+      try {
+        const events = JSON.parse(this.transfer.payload);
+        if (events.length > 0) {
+          events.push({ ...events[0] });
+          this.transfer.payload = JSON.stringify(events, null, 2);
+        }
+      } catch {}
+    },
+
+    resetPayload() {
+      this.transfer.payload = JSON.stringify(defaultEvents(), null, 2);
+      this.transfer.result = null;
+    },
+
+    async getSummary() {
+      if (!this.summary.stationId) return;
+      this.summary.loading = true;
+      this.summary.result = null;
+      try {
+        const res = await fetch(`/stations/${this.summary.stationId}/summary`, {
+          headers: this.authHeaders(),
+        });
+        const body = await res.json();
+        this.summary.result = body;
+        this.summary.error = !res.ok;
+      } catch (e) {
+        this.summary.result = { error: e.message };
+        this.summary.error = true;
+      } finally {
+        this.summary.loading = false;
+      }
+    },
+  };
+}
+</script>
+</body>
+</html>

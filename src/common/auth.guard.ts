@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Request } from 'express';
 import { AppConfig } from '../config/app.config';
 import { parseBasicAuth } from './parse-basic-auth';
 
@@ -16,13 +17,13 @@ export class AuthGuard implements CanActivate {
     throw new UnauthorizedException('Invalid or missing credentials');
   }
 
-  private checkApiKey(request: any): boolean {
+  private checkApiKey(request: Request): boolean {
     const apiKey = request.headers['x-api-key'];
     const appConfig = this.config.getOrThrow<AppConfig>('app');
     return !!apiKey && apiKey === appConfig.apiKey;
   }
 
-  private checkBasicAuth(request: any): boolean {
+  private checkBasicAuth(request: Request): boolean {
     const credentials = parseBasicAuth(request.headers['authorization']);
     if (!credentials) return false;
     const appConfig = this.config.getOrThrow<AppConfig>('app');

@@ -4,6 +4,8 @@ import { DRIZZLE, DrizzleDb } from './drizzle.provider';
 import { EventStore, InsertResult, StationSummary, TransferEventRecord } from './event-store.interface';
 import { transferEvents } from './schema';
 
+const APPROVED_STATUS = 'approved';
+
 @Injectable()
 export class PostgresEventStore implements EventStore {
   private readonly logger = new Logger(PostgresEventStore.name);
@@ -46,7 +48,7 @@ export class PostgresEventStore implements EventStore {
         .select({
           status: transferEvents.status,
           count: sql<string>`count(*)`,
-          total: sql<string>`coalesce(sum(case when ${transferEvents.status} = 'approved' then ${transferEvents.amount}::numeric else 0 end), 0)`,
+          total: sql<string>`coalesce(sum(case when ${transferEvents.status} = ${APPROVED_STATUS} then ${transferEvents.amount}::numeric else 0 end), 0)`,
         })
         .from(transferEvents)
         .where(eq(transferEvents.station_id, stationId))
@@ -62,7 +64,7 @@ export class PostgresEventStore implements EventStore {
         const count = Number(statusRow.count);
         eventsByStatus[statusRow.status] = count;
         eventsCount += count;
-        if (statusRow.status === 'approved') {
+        if (statusRow.status === APPROVED_STATUS) {
           totalApprovedAmount = Number(statusRow.total);
         }
       }

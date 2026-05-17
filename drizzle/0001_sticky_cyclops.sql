@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "transfer_events_station_status_idx" ON "transfer_events" ("station_id","status");

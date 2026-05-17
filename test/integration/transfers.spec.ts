@@ -34,40 +34,40 @@ describe('Transfer ingestion', () => {
     it('stores all events and reports inserted count', async () => {
       const events = [validEvent(), validEvent(), validEvent()];
 
-      const res = await ingest(events);
+      const response = await ingest(events);
 
-      expect(res.status).toBe(201);
-      expect(res.body.inserted).toBe(3);
-      expect(res.body.duplicates).toBe(0);
-      expect(res.body.rejected).toEqual([]);
+      expect(response.status).toBe(201);
+      expect(response.body.inserted).toBe(3);
+      expect(response.body.duplicates).toBe(0);
+      expect(response.body.rejected).toEqual([]);
     });
 
     it('stores events with unknown status without error', async () => {
-      const res = await ingest([validEvent({ status: 'pending_review' })]);
+      const response = await ingest([validEvent({ status: 'pending_review' })]);
 
-      expect(res.status).toBe(201);
-      expect(res.body.inserted).toBe(1);
+      expect(response.status).toBe(201);
+      expect(response.body.inserted).toBe(1);
     });
 
     it('accepts x-api-key header', async () => {
-      const res = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/api/v1/transfers')
         .set({ 'x-api-key': process.env.API_KEY ?? 'test-api-key' })
         .send({ events: [validEvent()] });
 
-      expect(res.status).toBe(201);
+      expect(response.status).toBe(201);
     });
 
     it('accepts Basic Auth credentials', async () => {
-      const user = process.env.BASIC_AUTH_USER ?? 'admin';
-      const pass = process.env.BASIC_AUTH_PASS ?? 'secret';
+      const username = process.env.BASIC_AUTH_USER ?? 'admin';
+      const password = process.env.BASIC_AUTH_PASS ?? 'secret';
 
-      const res = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/api/v1/transfers')
-        .auth(user, pass)
+        .auth(username, password)
         .send({ events: [validEvent()] });
 
-      expect(res.status).toBe(201);
+      expect(response.status).toBe(201);
     });
   });
 
@@ -76,11 +76,11 @@ describe('Transfer ingestion', () => {
       const event = validEvent();
       await ingest([event]);
 
-      const res = await ingest([event]);
+      const response = await ingest([event]);
 
-      expect(res.status).toBe(201);
-      expect(res.body.inserted).toBe(0);
-      expect(res.body.duplicates).toBe(1);
+      expect(response.status).toBe(201);
+      expect(response.body.inserted).toBe(0);
+      expect(response.body.duplicates).toBe(1);
     });
 
     it('handles a mixed batch of new and duplicate events', async () => {
@@ -88,11 +88,11 @@ describe('Transfer ingestion', () => {
       await ingest([existing]);
       const newEvent = validEvent();
 
-      const res = await ingest([existing, newEvent]);
+      const response = await ingest([existing, newEvent]);
 
-      expect(res.status).toBe(201);
-      expect(res.body.inserted).toBe(1);
-      expect(res.body.duplicates).toBe(1);
+      expect(response.status).toBe(201);
+      expect(response.body.inserted).toBe(1);
+      expect(response.body.duplicates).toBe(1);
     });
   });
 
@@ -100,60 +100,60 @@ describe('Transfer ingestion', () => {
     it('stores valid events and lists failures in rejected[]', async () => {
       const events = [validEvent(), { amount: -1, status: 'approved' }, validEvent()];
 
-      const res = await ingest(events);
+      const response = await ingest(events);
 
-      expect(res.status).toBe(201);
-      expect(res.body.inserted).toBe(2);
-      expect(res.body.rejected).toHaveLength(1);
-      expect(res.body.rejected[0].index).toBe(1);
-      expect(res.body.rejected[0].reason).toBeTruthy();
+      expect(response.status).toBe(201);
+      expect(response.body.inserted).toBe(2);
+      expect(response.body.rejected).toHaveLength(1);
+      expect(response.body.rejected[0].index).toBe(1);
+      expect(response.body.rejected[0].reason).toBeTruthy();
     });
 
     it('rejects events with missing required fields into rejected[]', async () => {
-      const res = await ingest([{ amount: 100, status: 'approved' }]);
+      const response = await ingest([{ amount: 100, status: 'approved' }]);
 
-      expect(res.status).toBe(201);
-      expect(res.body.inserted).toBe(0);
-      expect(res.body.rejected).toHaveLength(1);
-      expect(res.body.rejected[0].index).toBe(0);
-      expect(res.body.rejected[0].reason).toBeTruthy();
+      expect(response.status).toBe(201);
+      expect(response.body.inserted).toBe(0);
+      expect(response.body.rejected).toHaveLength(1);
+      expect(response.body.rejected[0].index).toBe(0);
+      expect(response.body.rejected[0].reason).toBeTruthy();
     });
 
     it('rejects events with negative amount into rejected[]', async () => {
-      const res = await ingest([validEvent({ amount: -1 })]);
+      const response = await ingest([validEvent({ amount: -1 })]);
 
-      expect(res.status).toBe(201);
-      expect(res.body.rejected).toHaveLength(1);
-      expect(res.body.rejected[0].index).toBe(0);
+      expect(response.status).toBe(201);
+      expect(response.body.rejected).toHaveLength(1);
+      expect(response.body.rejected[0].index).toBe(0);
     });
 
     it('rejects events with invalid created_at into rejected[]', async () => {
-      const res = await ingest([validEvent({ created_at: 'not-a-date' })]);
+      const response = await ingest([validEvent({ created_at: 'not-a-date' })]);
 
-      expect(res.status).toBe(201);
-      expect(res.body.rejected).toHaveLength(1);
-      expect(res.body.rejected[0].index).toBe(0);
+      expect(response.status).toBe(201);
+      expect(response.body.rejected).toHaveLength(1);
+      expect(response.body.rejected[0].index).toBe(0);
     });
   });
 
   describe('given an invalid request shape', () => {
     it('returns 400 when the events field is missing', async () => {
-      const res = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/api/v1/transfers')
         .set(authHeader)
         .send({});
 
-      expect(res.status).toBe(400);
+      expect(response.status).toBe(400);
     });
   });
 
   describe('given missing credentials', () => {
     it('returns 401', async () => {
-      const res = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/api/v1/transfers')
         .send({ events: [validEvent()] });
 
-      expect(res.status).toBe(401);
+      expect(response.status).toBe(401);
     });
   });
 });

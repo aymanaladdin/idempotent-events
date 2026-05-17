@@ -139,7 +139,7 @@ describe('GET /stations/:station_id/summary', () => {
     await ingest([event(sid2, { amount: 999, status: 'approved' })]);
 
     const res = await request(app.getHttpServer())
-      .get(`/stations/${sid1}/summary`)
+      .get(`/api/v1/stations/${sid1}/summary`)
       .set(authHeader);
 
     expect(Number(res.body.total_approved_amount)).toBe(500);

@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import {
@@ -13,6 +13,8 @@ import { TransferEventDto } from './dto/create-transfers.dto';
 
 @Injectable()
 export class TransfersService {
+  private readonly logger = new Logger(TransfersService.name);
+
   constructor(@Inject(EVENT_STORE) private readonly store: EventStore) {}
 
   async ingest(dto: CreateTransfersDto): Promise<InsertResult> {
@@ -45,6 +47,11 @@ export class TransfersService {
     }
 
     const storeResult = await this.store.insertBatch(valid);
+
+    this.logger.log(
+      `Batch processed — inserted: ${storeResult.inserted}, duplicates: ${storeResult.duplicates}, rejected: ${rejected.length}`,
+    );
+
     return { ...storeResult, rejected };
   }
 }

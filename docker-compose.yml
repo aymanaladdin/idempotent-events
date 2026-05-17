@@ -1,6 +1,8 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      target: production
     ports:
       - "3000:3000"
     environment:
@@ -13,7 +15,7 @@ services:
       postgres:
         condition: service_healthy
     command: >
-      sh -c "node dist/migrate.js && node dist/main"
+      sh -c "node dist/migrate.js && node dist/main.js"
 
   postgres:
     image: postgres:17-alpine
@@ -40,6 +42,31 @@ services:
       - "5050:80"
     depends_on:
       - postgres
+
+  test:
+    build:
+      context: .
+      target: test
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/idempotent_events_test
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - test
+
+  seeder:
+    build:
+      context: .
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/idempotent_events
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: npx ts-node scripts/seed.ts
+    profiles:
+      - tools
 
 volumes:
   postgres_data:

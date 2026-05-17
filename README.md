@@ -25,6 +25,16 @@ npm run db:migrate    # apply migrations via drizzle-kit
 make run              # or: npm run start:dev
 ```
 
+### Environment Variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `DATABASE_URL` | PostgreSQL connection string | — |
+| `API_KEY` | Value expected in `x-api-key` header | — |
+| `BASIC_AUTH_USER` | Basic auth username | `admin` |
+| `BASIC_AUTH_PASS` | Basic auth password | `secret` |
+| `PORT` | HTTP port | `3000` |
+
 ## Run with Docker
 
 ```bash
@@ -49,6 +59,14 @@ make test
 # Docker
 make docker-test
 ```
+
+22 integration tests covering:
+- Batch insert returns correct `inserted` / `duplicates` counts
+- Duplicate `event_id` is silently ignored, totals unchanged
+- Out-of-order arrival produces correct summary
+- Concurrent POSTs with the same `event_id` never double-insert
+- Partial accept: valid events are inserted despite invalid siblings in the batch
+- Summary correctness per station (approved amount, event count, by-status breakdown)
 
 ## Seed Demo Data
 
@@ -112,6 +130,47 @@ Response:
 }
 ```
 
+### POST /api/v1/transfers — Partial accept (one invalid event)
+
+```bash
+curl -X POST http://localhost:3000/api/v1/transfers \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: change-me-in-production" \
+  -d '{
+    "events": [
+      {
+        "event_id": "evt-003",
+        "station_id": "station-42",
+        "amount": 150.00,
+        "status": "approved",
+        "created_at": "2026-02-19T12:00:00Z"
+      },
+      {
+        "event_id": "evt-bad",
+        "station_id": "station-42",
+        "amount": -50,
+        "status": "approved",
+        "created_at": "2026-02-19T12:01:00Z"
+      }
+    ]
+  }'
+```
+
+Response:
+```json
+{
+  "inserted": 1,
+  "duplicates": 0,
+  "rejected": [
+    {
+      "index": 1,
+      "event_id": "evt-bad",
+      "errors": ["amount must not be less than 0"]
+    }
+  ]
+}
+```
+
 ### GET /api/v1/stations/:station_id/summary — Reconciliation summary
 
 ```bash
@@ -172,6 +231,12 @@ The batch follows a **validate-all-first, then bulk-insert** pipeline:
 3. Invalid events are returned in the `rejected` array with their index and reason.
 
 This approach is chosen over fail-fast because it makes the endpoint safe to consume from message queues, pub/sub systems, or any replay mechanism — a single invalid event in a replayed batch will not block valid new events from being inserted.
+
+**Validation rules (per event):**
+- `event_id`, `station_id`, `status`, `created_at` — required strings
+- `amount` — required, must be a non-negative number
+- `created_at` — must be a valid ISO 8601 date string
+- `status` — any string is accepted; unknown values are stored but do not count toward `total_approved_amount`
 
 ### events_count Semantics
 

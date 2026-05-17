@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { createTestApp } from '../helpers/app';
+import { buildTransferEvent } from '../factories/transfer-event.factory';
 
 describe('Station summary', () => {
   let app: INestApplication;
@@ -23,15 +24,6 @@ describe('Station summary', () => {
       .set(authHeader)
       .send({ events });
 
-  const event = (stationId: string, overrides = {}) => ({
-    event_id: `evt-${Math.random().toString(36).slice(2)}`,
-    station_id: stationId,
-    amount: 100,
-    status: 'approved',
-    created_at: '2026-01-01T00:00:00Z',
-    ...overrides,
-  });
-
   describe('given no events have been stored for the station', () => {
     it('returns 404', async () => {
       const response = await request(app.getHttpServer())
@@ -46,9 +38,9 @@ describe('Station summary', () => {
     it('sums only approved amounts in total_approved_amount', async () => {
       const stationId = uniqueStation();
       await ingest([
-        event(stationId, { amount: 100, status: 'approved' }),
-        event(stationId, { amount: 200, status: 'approved' }),
-        event(stationId, { amount: 999, status: 'pending' }),
+        buildTransferEvent({ station_id: stationId, amount: 100, status: 'approved' }),
+        buildTransferEvent({ station_id: stationId, amount: 200, status: 'approved' }),
+        buildTransferEvent({ station_id: stationId, amount: 999, status: 'pending' }),
       ]);
 
       const response = await request(app.getHttpServer())
@@ -62,10 +54,10 @@ describe('Station summary', () => {
     it('counts all events regardless of status in events_count', async () => {
       const stationId = uniqueStation();
       await ingest([
-        event(stationId, { status: 'approved' }),
-        event(stationId, { status: 'pending' }),
-        event(stationId, { status: 'rejected' }),
-        event(stationId, { status: 'unknown_future_status' }),
+        buildTransferEvent({ station_id: stationId, status: 'approved' }),
+        buildTransferEvent({ station_id: stationId, status: 'pending' }),
+        buildTransferEvent({ station_id: stationId, status: 'rejected' }),
+        buildTransferEvent({ station_id: stationId, status: 'unknown_future_status' }),
       ]);
 
       const response = await request(app.getHttpServer())
@@ -79,9 +71,9 @@ describe('Station summary', () => {
     it('returns a per-status breakdown in events_by_status', async () => {
       const stationId = uniqueStation();
       await ingest([
-        event(stationId, { status: 'approved' }),
-        event(stationId, { status: 'approved' }),
-        event(stationId, { status: 'pending' }),
+        buildTransferEvent({ station_id: stationId, status: 'approved' }),
+        buildTransferEvent({ station_id: stationId, status: 'approved' }),
+        buildTransferEvent({ station_id: stationId, status: 'pending' }),
       ]);
 
       const response = await request(app.getHttpServer())
@@ -98,9 +90,9 @@ describe('Station summary', () => {
     it('produces the same totals as in-order arrival', async () => {
       const stationId = uniqueStation();
       await ingest([
-        event(stationId, { amount: 50, status: 'approved', created_at: '2026-03-01T00:00:00Z' }),
-        event(stationId, { amount: 150, status: 'approved', created_at: '2026-01-01T00:00:00Z' }),
-        event(stationId, { amount: 100, status: 'approved', created_at: '2026-02-01T00:00:00Z' }),
+        buildTransferEvent({ station_id: stationId, amount: 50, status: 'approved', created_at: '2026-03-01T00:00:00Z' }),
+        buildTransferEvent({ station_id: stationId, amount: 150, status: 'approved', created_at: '2026-01-01T00:00:00Z' }),
+        buildTransferEvent({ station_id: stationId, amount: 100, status: 'approved', created_at: '2026-02-01T00:00:00Z' }),
       ]);
 
       const response = await request(app.getHttpServer())
@@ -115,7 +107,7 @@ describe('Station summary', () => {
   describe('given duplicate events', () => {
     it('does not change totals when the same batch is replayed', async () => {
       const stationId = uniqueStation();
-      const duplicateTransferEvent = event(stationId, { amount: 100, status: 'approved' });
+      const duplicateTransferEvent = buildTransferEvent({ station_id: stationId, amount: 100, status: 'approved' });
       await ingest([duplicateTransferEvent]);
       await ingest([duplicateTransferEvent]);
 
@@ -133,8 +125,8 @@ describe('Station summary', () => {
     it('isolates each station summary independently', async () => {
       const firstStationId = uniqueStation();
       const secondStationId = uniqueStation();
-      await ingest([event(firstStationId, { amount: 500, status: 'approved' })]);
-      await ingest([event(secondStationId, { amount: 999, status: 'approved' })]);
+      await ingest([buildTransferEvent({ station_id: firstStationId, amount: 500, status: 'approved' })]);
+      await ingest([buildTransferEvent({ station_id: secondStationId, amount: 999, status: 'approved' })]);
 
       const response = await request(app.getHttpServer())
         .get(`/api/v1/stations/${firstStationId}/summary`)

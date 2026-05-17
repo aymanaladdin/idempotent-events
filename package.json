@@ -14,7 +14,8 @@
     "test:cov": "jest --coverage --runInBand --forceExit",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "ts-node scripts/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -33,7 +34,8 @@
     "passport-http": "^0.3.0",
     "pg": "^8.11.0",
     "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "uuidv7": "^1.2.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",

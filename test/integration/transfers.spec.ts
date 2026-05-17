@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { createTestApp } from '../helpers/app';
+import { buildTransferEvent } from '../factories/transfer-event.factory';
 
 describe('Transfer ingestion', () => {
   let app: INestApplication;
@@ -15,15 +16,6 @@ describe('Transfer ingestion', () => {
 
   const authHeader = { 'x-api-key': process.env.API_KEY ?? 'test-api-key' };
 
-  const validEvent = (overrides = {}) => ({
-    event_id: `evt-${Math.random().toString(36).slice(2)}`,
-    station_id: 'station-1',
-    amount: 100,
-    status: 'approved',
-    created_at: '2026-01-01T00:00:00Z',
-    ...overrides,
-  });
-
   const ingest = (events: object[]) =>
     request(app.getHttpServer())
       .post('/api/v1/transfers')
@@ -32,7 +24,7 @@ describe('Transfer ingestion', () => {
 
   describe('given a valid batch', () => {
     it('stores all events and reports inserted count', async () => {
-      const events = [validEvent(), validEvent(), validEvent()];
+      const events = [buildTransferEvent(), buildTransferEvent(), buildTransferEvent()];
 
       const response = await ingest(events);
 
@@ -43,7 +35,7 @@ describe('Transfer ingestion', () => {
     });
 
     it('stores events with unknown status without error', async () => {
-      const response = await ingest([validEvent({ status: 'pending_review' })]);
+      const response = await ingest([buildTransferEvent({ status: 'pending_review' })]);
 
       expect(response.status).toBe(201);
       expect(response.body.inserted).toBe(1);
@@ -53,7 +45,7 @@ describe('Transfer ingestion', () => {
       const response = await request(app.getHttpServer())
         .post('/api/v1/transfers')
         .set({ 'x-api-key': process.env.API_KEY ?? 'test-api-key' })
-        .send({ events: [validEvent()] });
+        .send({ events: [buildTransferEvent()] });
 
       expect(response.status).toBe(201);
     });
@@ -65,7 +57,7 @@ describe('Transfer ingestion', () => {
       const response = await request(app.getHttpServer())
         .post('/api/v1/transfers')
         .auth(username, password)
-        .send({ events: [validEvent()] });
+        .send({ events: [buildTransferEvent()] });
 
       expect(response.status).toBe(201);
     });
@@ -73,7 +65,7 @@ describe('Transfer ingestion', () => {
 
   describe('given a batch containing duplicates', () => {
     it('silently ignores duplicate event_ids and reports duplicate count', async () => {
-      const event = validEvent();
+      const event = buildTransferEvent();
       await ingest([event]);
 
       const response = await ingest([event]);
@@ -84,9 +76,9 @@ describe('Transfer ingestion', () => {
     });
 
     it('handles a mixed batch of new and duplicate events', async () => {
-      const existing = validEvent();
+      const existing = buildTransferEvent();
       await ingest([existing]);
-      const newEvent = validEvent();
+      const newEvent = buildTransferEvent();
 
       const response = await ingest([existing, newEvent]);
 
@@ -98,7 +90,7 @@ describe('Transfer ingestion', () => {
 
   describe('given events with validation failures', () => {
     it('stores valid events and lists failures in rejected[]', async () => {
-      const events = [validEvent(), { amount: -1, status: 'approved' }, validEvent()];
+      const events = [buildTransferEvent(), { amount: -1, status: 'approved' }, buildTransferEvent()];
 
       const response = await ingest(events);
 
@@ -120,7 +112,7 @@ describe('Transfer ingestion', () => {
     });
 
     it('rejects events with negative amount into rejected[]', async () => {
-      const response = await ingest([validEvent({ amount: -1 })]);
+      const response = await ingest([buildTransferEvent({ amount: -1 })]);
 
       expect(response.status).toBe(201);
       expect(response.body.rejected).toHaveLength(1);
@@ -128,7 +120,7 @@ describe('Transfer ingestion', () => {
     });
 
     it('rejects events with invalid created_at into rejected[]', async () => {
-      const response = await ingest([validEvent({ created_at: 'not-a-date' })]);
+      const response = await ingest([buildTransferEvent({ created_at: 'not-a-date' })]);
 
       expect(response.status).toBe(201);
       expect(response.body.rejected).toHaveLength(1);
@@ -151,7 +143,7 @@ describe('Transfer ingestion', () => {
     it('returns 401', async () => {
       const response = await request(app.getHttpServer())
         .post('/api/v1/transfers')
-        .send({ events: [validEvent()] });
+        .send({ events: [buildTransferEvent()] });
 
       expect(response.status).toBe(401);
     });

@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { createTestApp } from '../helpers/app';
+import { buildTransferEvent } from '../factories/transfer-event.factory';
 
 describe('Idempotency under concurrent load', () => {
   let app: INestApplication;
@@ -25,13 +26,7 @@ describe('Idempotency under concurrent load', () => {
   describe('given the same event_id sent by 10 concurrent requests', () => {
     it('stores exactly one event and counts 9 duplicates', async () => {
       const stationId = uniqueStation();
-      const event = {
-        event_id: `evt-concurrent-${Math.random().toString(36).slice(2)}`,
-        station_id: stationId,
-        amount: 250,
-        status: 'approved',
-        created_at: '2026-01-01T00:00:00Z',
-      };
+      const event = buildTransferEvent({ station_id: stationId, amount: 250, status: 'approved' });
       const concurrentRequests = Array.from({ length: 10 }, () =>
         request(app.getHttpServer())
           .post('/api/v1/transfers')
@@ -55,8 +50,8 @@ describe('Idempotency under concurrent load', () => {
     it('produces the same summary totals as a single insert', async () => {
       const stationId = uniqueStation();
       const events = [
-        { event_id: `e1-${stationId}`, station_id: stationId, amount: 100, status: 'approved', created_at: '2026-01-01T00:00:00Z' },
-        { event_id: `e2-${stationId}`, station_id: stationId, amount: 200, status: 'approved', created_at: '2026-01-02T00:00:00Z' },
+        buildTransferEvent({ event_id: `e1-${stationId}`, station_id: stationId, amount: 100, created_at: '2026-01-01T00:00:00Z' }),
+        buildTransferEvent({ event_id: `e2-${stationId}`, station_id: stationId, amount: 200, created_at: '2026-01-02T00:00:00Z' }),
       ];
 
       await request(app.getHttpServer()).post('/api/v1/transfers').set(authHeader).send({ events });
@@ -73,20 +68,10 @@ describe('Idempotency under concurrent load', () => {
   describe('given concurrent batches with overlapping event_ids', () => {
     it('stores each unique event_id once and computes the correct approved total', async () => {
       const stationId = uniqueStation();
-      const sharedEvent = {
-        event_id: `shared-${Math.random().toString(36).slice(2)}`,
-        station_id: stationId,
-        amount: 500,
-        status: 'approved',
-        created_at: '2026-01-01T00:00:00Z',
-      };
-      const uniqueEvents = Array.from({ length: 5 }, (_, i) => ({
-        event_id: `unique-${stationId}-${i}`,
-        station_id: stationId,
-        amount: 10,
-        status: 'approved',
-        created_at: '2026-01-01T00:00:00Z',
-      }));
+      const sharedEvent = buildTransferEvent({ station_id: stationId, amount: 500 });
+      const uniqueEvents = Array.from({ length: 5 }, (_, i) =>
+        buildTransferEvent({ event_id: `unique-${stationId}-${i}`, station_id: stationId, amount: 10 }),
+      );
 
       const batches = uniqueEvents.map((uniqueEvent) =>
         request(app.getHttpServer())

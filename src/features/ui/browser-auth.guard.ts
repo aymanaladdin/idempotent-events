@@ -1,7 +1,8 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
-import { AppConfig } from '../config/app.config';
+import { AppConfig } from '../../config/app.config';
+import { parseBasicAuth } from '../../common/parse-basic-auth';
 
 @Injectable()
 export class BrowserAuthGuard implements CanActivate {
@@ -12,16 +13,10 @@ export class BrowserAuthGuard implements CanActivate {
     const request = http.getRequest();
     const response = http.getResponse<Response>();
 
-    const authHeader = request.headers['authorization'];
-
-    if (authHeader?.startsWith('Basic ')) {
-      const base64 = authHeader.slice(6);
-      const decoded = Buffer.from(base64, 'base64').toString('utf-8');
-      const [user, ...passParts] = decoded.split(':');
-      const password = passParts.join(':');
-
+    const credentials = parseBasicAuth(request.headers['authorization']);
+    if (credentials) {
       const appConfig = this.config.getOrThrow<AppConfig>('app');
-      if (user === appConfig.basicAuthUser && password === appConfig.basicAuthPass) {
+      if (credentials.user === appConfig.basicAuthUser && credentials.password === appConfig.basicAuthPass) {
         return true;
       }
     }

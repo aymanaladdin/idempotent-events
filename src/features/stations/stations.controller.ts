@@ -7,7 +7,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ThrottlerGuard } from '@nestjs/throttler';
-import { AuthGuard } from '../common/auth.guard';
+import { AuthGuard } from '../../common/auth.guard';
 import { StationSummaryDto } from './dto/station-summary.dto';
 import { StationsService } from './stations.service';
 

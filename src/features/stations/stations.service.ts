@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { EVENT_STORE, EventStore, StationSummary } from '../storage/event-store.interface';
+import { EVENT_STORE, EventStore, StationSummary } from '../../infrastructure/storage/event-store.interface';
 
 @Injectable()
 export class StationsService {

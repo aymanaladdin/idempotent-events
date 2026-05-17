@@ -7,7 +7,7 @@ import {
   InsertResult,
   RejectedEvent,
   TransferEventRecord,
-} from '../storage/event-store.interface';
+} from '../../infrastructure/storage/event-store.interface';
 import { CreateTransfersDto } from './dto/create-transfers.dto';
 import { TransferEventDto } from './dto/create-transfers.dto';
 

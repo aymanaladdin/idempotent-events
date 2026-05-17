@@ -2,7 +2,7 @@ import { Controller, Get, Inject, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { HealthCheck, HealthCheckService, HealthIndicatorResult } from '@nestjs/terminus';
 import { sql } from 'drizzle-orm';
-import { AuthGuard } from '../common/auth.guard';
+import { AuthGuard } from '../../common/auth.guard';
 import { DRIZZLE, DrizzleDb } from '../storage/drizzle.provider';
 
 @ApiTags('health')

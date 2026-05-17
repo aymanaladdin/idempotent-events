@@ -13,7 +13,7 @@ services:
       postgres:
         condition: service_healthy
     command: >
-      sh -c "node scripts/migrate.js && node dist/main"
+      sh -c "node dist/migrate.js && node dist/main"
 
   postgres:
     image: postgres:16-alpine

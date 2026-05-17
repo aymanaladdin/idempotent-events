@@ -21,10 +21,8 @@ Station transfer event ingestion API with idempotency and concurrency safety gua
 ```bash
 cp .env.example .env
 npm install
-# Start Postgres, then run migrations and start the server
-node scripts/migrate.js
-make run
-# or: npm run start:dev
+npm run db:migrate    # apply migrations via drizzle-kit
+make run              # or: npm run start:dev
 ```
 
 ## Run with Docker
@@ -51,6 +49,18 @@ make test
 # Docker
 make docker-test
 ```
+
+## Seed Demo Data
+
+```bash
+# Local (requires running Postgres)
+make seed
+
+# Docker (uses the builder container — no production image impact)
+make docker-seed
+```
+
+Inserts 10 stations × 50 events each with randomised statuses (approved / pending / rejected / unknown).
 
 ## API Routes
 
@@ -141,6 +151,10 @@ curl http://localhost:3000/health/ready  # 200 when DB up, 503 when down
 
 Each `event_id` has a `UNIQUE INDEX` on the `transfer_events` table. Inserts use Drizzle's `.onConflictDoNothing()` which maps to PostgreSQL's `INSERT ... ON CONFLICT DO NOTHING`. Duplicate events are silently skipped — never overwritten.
 
+This is preferred over a read-then-write check because it is a single atomic round-trip — no TOCTOU race is possible between the existence check and the insert. The unique constraint enforces idempotency and concurrency safety from the same primitive, with no extra application logic.
+
+It is also deliberately `DO NOTHING` rather than `ON CONFLICT DO UPDATE`: on a conflict, PostgreSQL discards the incoming row immediately after the index lookup — no heap write, no WAL entry, no new MVCC row version. `ON CONFLICT DO UPDATE` would write a new row version and generate WAL traffic on every duplicate, accumulating dead tuples under high replay rates.
+
 The response distinguishes three outcomes per batch:
 - **inserted** — new events stored
 - **duplicates** — events already present, silently ignored
@@ -178,4 +192,17 @@ All API endpoints are versioned via URI prefix (`/api/v1/...`). The global `/api
 
 ### Storage Port
 
-The `EventStore` interface in `src/storage/event-store.interface.ts` defines the persistence contract. The current implementation is `PostgresEventStore`. Swapping to a different backend requires only a new class implementing the same interface and updating the provider in `StorageModule`.
+The `EventStore` interface in `src/infrastructure/storage/event-store.interface.ts` defines the persistence contract. The current implementation is `PostgresEventStore`. Swapping to a different backend requires only a new class implementing the same interface and updating the provider in `StorageModule`.
+
+```
+src/
+  features/
+    transfers/        # POST /transfers — controller, service, DTOs
+    stations/         # GET /stations/:id/summary — controller, service, DTOs
+    ui/               # /ui/dashboard — browser-auth guard, static serving
+  infrastructure/
+    storage/          # EventStore port + PostgresEventStore adapter
+    health/           # /health/live + /health/ready
+  common/             # parseBasicAuth helper, shared auth guard
+  config/             # env validation, app config
+```

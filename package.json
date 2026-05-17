@@ -23,6 +23,7 @@
     "@nestjs/passport": "^10.0.0",
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/swagger": "^7.0.0",
+    "@nestjs/terminus": "^11.1.1",
     "@nestjs/throttler": "^5.0.0",
     "@scalar/nestjs-api-reference": "^1.1.16",
     "class-transformer": "^0.5.1",

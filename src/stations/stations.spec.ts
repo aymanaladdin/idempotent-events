@@ -28,7 +28,7 @@ describe('GET /stations/:station_id/summary', () => {
 
   const ingest = (events: any[]) =>
     request(app.getHttpServer())
-      .post('/transfers')
+      .post('/api/v1/transfers')
       .set(authHeader)
       .send({ events });
 
@@ -43,7 +43,7 @@ describe('GET /stations/:station_id/summary', () => {
 
   it('returns 404 for unknown station', async () => {
     const res = await request(app.getHttpServer())
-      .get('/stations/nonexistent-xyz/summary')
+      .get('/api/v1/stations/nonexistent-xyz/summary')
       .set(authHeader);
 
     expect(res.status).toBe(404);
@@ -58,7 +58,7 @@ describe('GET /stations/:station_id/summary', () => {
     ]);
 
     const res = await request(app.getHttpServer())
-      .get(`/stations/${sid}/summary`)
+      .get(`/api/v1/stations/${sid}/summary`)
       .set(authHeader);
 
     expect(res.status).toBe(200);
@@ -75,7 +75,7 @@ describe('GET /stations/:station_id/summary', () => {
     ]);
 
     const res = await request(app.getHttpServer())
-      .get(`/stations/${sid}/summary`)
+      .get(`/api/v1/stations/${sid}/summary`)
       .set(authHeader);
 
     expect(res.status).toBe(200);
@@ -91,7 +91,7 @@ describe('GET /stations/:station_id/summary', () => {
     ]);
 
     const res = await request(app.getHttpServer())
-      .get(`/stations/${sid}/summary`)
+      .get(`/api/v1/stations/${sid}/summary`)
       .set(authHeader);
 
     expect(res.status).toBe(200);
@@ -108,7 +108,7 @@ describe('GET /stations/:station_id/summary', () => {
     ]);
 
     const res = await request(app.getHttpServer())
-      .get(`/stations/${sid}/summary`)
+      .get(`/api/v1/stations/${sid}/summary`)
       .set(authHeader);
 
     expect(res.status).toBe(200);
@@ -123,7 +123,7 @@ describe('GET /stations/:station_id/summary', () => {
     await ingest([e]);
 
     const res = await request(app.getHttpServer())
-      .get(`/stations/${sid}/summary`)
+      .get(`/api/v1/stations/${sid}/summary`)
       .set(authHeader);
 
     expect(res.status).toBe(200);

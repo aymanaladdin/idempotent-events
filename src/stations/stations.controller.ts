@@ -7,7 +7,7 @@ import { StationsService } from './stations.service';
 @ApiTags('stations')
 @ApiSecurity('x-api-key')
 @UseGuards(ThrottlerGuard, AuthGuard)
-@Controller('stations')
+@Controller({ path: 'stations', version: '1' })
 export class StationsController {
   constructor(private readonly stationsService: StationsService) {}
 

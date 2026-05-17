@@ -28,7 +28,7 @@ describe('Concurrency and idempotency', () => {
 
   const getSummary = (sid: string) =>
     request(app.getHttpServer())
-      .get(`/stations/${sid}/summary`)
+      .get(`/api/v1/stations/${sid}/summary`)
       .set(authHeader);
 
   it('concurrent POSTs with same event_id do not double-insert', async () => {
@@ -43,7 +43,7 @@ describe('Concurrency and idempotency', () => {
 
     const concurrentRequests = Array.from({ length: 10 }, () =>
       request(app.getHttpServer())
-        .post('/transfers')
+        .post('/api/v1/transfers')
         .set(authHeader)
         .send({ events: [event] }),
     );
@@ -68,9 +68,9 @@ describe('Concurrency and idempotency', () => {
       { event_id: `e2-${sid}`, station_id: sid, amount: 200, status: 'approved', created_at: '2026-01-02T00:00:00Z' },
     ];
 
-    await request(app.getHttpServer()).post('/transfers').set(authHeader).send({ events });
-    await request(app.getHttpServer()).post('/transfers').set(authHeader).send({ events });
-    await request(app.getHttpServer()).post('/transfers').set(authHeader).send({ events });
+    await request(app.getHttpServer()).post('/api/v1/transfers').set(authHeader).send({ events });
+    await request(app.getHttpServer()).post('/api/v1/transfers').set(authHeader).send({ events });
+    await request(app.getHttpServer()).post('/api/v1/transfers').set(authHeader).send({ events });
 
     const summary = await getSummary(sid);
     expect(Number(summary.body.total_approved_amount)).toBe(300);
@@ -96,7 +96,7 @@ describe('Concurrency and idempotency', () => {
 
     const batches = uniqueEvents.map((e) =>
       request(app.getHttpServer())
-        .post('/transfers')
+        .post('/api/v1/transfers')
         .set(authHeader)
         .send({ events: [sharedEvent, e] }),
     );

@@ -36,7 +36,7 @@ describe('POST /transfers', () => {
   it('inserts a batch and returns correct inserted count', async () => {
     const events = [validEvent(), validEvent(), validEvent()];
     const res = await request(app.getHttpServer())
-      .post('/transfers')
+      .post('/api/v1/transfers')
       .set(authHeader)
       .send({ events });
 
@@ -49,12 +49,12 @@ describe('POST /transfers', () => {
   it('counts duplicates correctly without reinserting them', async () => {
     const event = validEvent();
     await request(app.getHttpServer())
-      .post('/transfers')
+      .post('/api/v1/transfers')
       .set(authHeader)
       .send({ events: [event] });
 
     const res = await request(app.getHttpServer())
-      .post('/transfers')
+      .post('/api/v1/transfers')
       .set(authHeader)
       .send({ events: [event] });
 
@@ -66,13 +66,13 @@ describe('POST /transfers', () => {
   it('handles mixed batch of new and duplicate events', async () => {
     const existing = validEvent();
     await request(app.getHttpServer())
-      .post('/transfers')
+      .post('/api/v1/transfers')
       .set(authHeader)
       .send({ events: [existing] });
 
     const newEvent = validEvent();
     const res = await request(app.getHttpServer())
-      .post('/transfers')
+      .post('/api/v1/transfers')
       .set(authHeader)
       .send({ events: [existing, newEvent] });
 
@@ -83,7 +83,7 @@ describe('POST /transfers', () => {
 
   it('rejects request with missing required fields', async () => {
     const res = await request(app.getHttpServer())
-      .post('/transfers')
+      .post('/api/v1/transfers')
       .set(authHeader)
       .send({ events: [{ amount: 100, status: 'approved' }] });
 
@@ -92,7 +92,7 @@ describe('POST /transfers', () => {
 
   it('rejects negative amount', async () => {
     const res = await request(app.getHttpServer())
-      .post('/transfers')
+      .post('/api/v1/transfers')
       .set(authHeader)
       .send({ events: [validEvent({ amount: -1 })] });
 
@@ -101,7 +101,7 @@ describe('POST /transfers', () => {
 
   it('rejects invalid created_at format', async () => {
     const res = await request(app.getHttpServer())
-      .post('/transfers')
+      .post('/api/v1/transfers')
       .set(authHeader)
       .send({ events: [validEvent({ created_at: 'not-a-date' })] });
 
@@ -110,7 +110,7 @@ describe('POST /transfers', () => {
 
   it('stores events with unknown status without error', async () => {
     const res = await request(app.getHttpServer())
-      .post('/transfers')
+      .post('/api/v1/transfers')
       .set(authHeader)
       .send({ events: [validEvent({ status: 'pending_review' })] });
 
@@ -120,7 +120,7 @@ describe('POST /transfers', () => {
 
   it('returns 401 without credentials', async () => {
     const res = await request(app.getHttpServer())
-      .post('/transfers')
+      .post('/api/v1/transfers')
       .send({ events: [validEvent()] });
 
     expect(res.status).toBe(401);
@@ -130,7 +130,7 @@ describe('POST /transfers', () => {
     const user = process.env.BASIC_AUTH_USER ?? 'admin';
     const pass = process.env.BASIC_AUTH_PASS ?? 'secret';
     const res = await request(app.getHttpServer())
-      .post('/transfers')
+      .post('/api/v1/transfers')
       .auth(user, pass)
       .send({ events: [validEvent()] });
 

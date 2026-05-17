@@ -15,7 +15,7 @@ import { TransfersService } from './transfers.service';
 @ApiSecurity('x-api-key')
 @ApiBearerAuth()
 @UseGuards(ThrottlerGuard, AuthGuard)
-@Controller('transfers')
+@Controller({ path: 'transfers', version: '1' })
 export class TransfersController {
   constructor(private readonly transfersService: TransfersService) {}
 

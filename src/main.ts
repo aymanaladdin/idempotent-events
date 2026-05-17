@@ -42,7 +42,7 @@ async function bootstrap() {
     }),
   );
 
-  const port = app.get(ConfigService).get<AppConfig>('app').port;
+  const port = app.get(ConfigService).getOrThrow<AppConfig>('app').port;
   await app.listen(port);
 }
 

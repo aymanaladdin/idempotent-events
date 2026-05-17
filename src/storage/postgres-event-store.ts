@@ -15,12 +15,12 @@ export class PostgresEventStore implements EventStore {
       return { inserted: 0, duplicates: 0, rejected: [] };
     }
 
-    const rows = events.map((e) => ({
-      event_id: e.event_id,
-      station_id: e.station_id,
-      amount: String(e.amount),
-      status: e.status,
-      created_at: e.created_at,
+    const rows = events.map((event) => ({
+      event_id: event.event_id,
+      station_id: event.station_id,
+      amount: String(event.amount),
+      status: event.status,
+      created_at: event.created_at,
     }));
 
     try {
@@ -34,9 +34,9 @@ export class PostgresEventStore implements EventStore {
       const duplicates = events.length - inserted;
 
       return { inserted, duplicates, rejected: [] };
-    } catch (err) {
-      this.logger.error('Failed to insert batch', (err as Error).stack);
-      throw err;
+    } catch (error) {
+      this.logger.error('Failed to insert batch', (error as Error).stack);
+      throw error;
     }
   }
 
@@ -54,23 +54,28 @@ export class PostgresEventStore implements EventStore {
 
       if (rows.length === 0) return null;
 
-      const events_by_status: Record<string, number> = {};
-      let events_count = 0;
-      let total_approved_amount = 0;
+      const eventsByStatus: Record<string, number> = {};
+      let eventsCount = 0;
+      let totalApprovedAmount = 0;
 
-      for (const row of rows) {
-        const count = Number(row.count);
-        events_by_status[row.status] = count;
-        events_count += count;
-        if (row.status === 'approved') {
-          total_approved_amount = Number(row.total);
+      for (const statusRow of rows) {
+        const count = Number(statusRow.count);
+        eventsByStatus[statusRow.status] = count;
+        eventsCount += count;
+        if (statusRow.status === 'approved') {
+          totalApprovedAmount = Number(statusRow.total);
         }
       }
 
-      return { station_id: stationId, total_approved_amount, events_count, events_by_status };
-    } catch (err) {
-      this.logger.error(`Failed to get summary for station ${stationId}`, (err as Error).stack);
-      throw err;
+      return {
+        station_id: stationId,
+        total_approved_amount: totalApprovedAmount,
+        events_count: eventsCount,
+        events_by_status: eventsByStatus,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get summary for station ${stationId}`, (error as Error).stack);
+      throw error;
     }
   }
 }

@@ -29,7 +29,7 @@ export function validate(config: Record<string, unknown>) {
   if (errors.length > 0) {
     throw new Error(
       `Configuration validation failed:\n${errors
-        .map((e) => Object.values(e.constraints ?? {}).join(', '))
+        .map((validationError) => Object.values(validationError.constraints ?? {}).join(', '))
         .join('\n')}`,
     );
   }

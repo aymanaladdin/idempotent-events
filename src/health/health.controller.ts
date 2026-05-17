@@ -39,8 +39,8 @@ export class HealthController {
     try {
       await this.db.execute(sql`SELECT 1`);
       return { database: { status: 'up' } };
-    } catch (err) {
-      return { database: { status: 'down', message: (err as Error).message } };
+    } catch (error) {
+      return { database: { status: 'down', message: (error as Error).message } };
     }
   }
 }

@@ -18,10 +18,10 @@ export class BrowserAuthGuard implements CanActivate {
       const base64 = authHeader.slice(6);
       const decoded = Buffer.from(base64, 'base64').toString('utf-8');
       const [user, ...passParts] = decoded.split(':');
-      const pass = passParts.join(':');
+      const password = passParts.join(':');
 
-      const cfg = this.config.getOrThrow<AppConfig>('app');
-      if (user === cfg.basicAuthUser && pass === cfg.basicAuthPass) {
+      const appConfig = this.config.getOrThrow<AppConfig>('app');
+      if (user === appConfig.basicAuthUser && password === appConfig.basicAuthPass) {
         return true;
       }
     }

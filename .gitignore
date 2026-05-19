@@ -23,3 +23,7 @@ lerna-debug.log*
 .temp
 .tmp
 tsconfig.build.tsbuildinfo
+
+# editor / agent workspace files
+CLAUDE.md
+.claude/

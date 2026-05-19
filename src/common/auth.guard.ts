@@ -20,6 +20,7 @@ export class AuthGuard implements CanActivate {
   private checkApiKey(request: Request): boolean {
     const apiKey = request.headers['x-api-key'];
     const appConfig = this.config.getOrThrow<AppConfig>('app');
+
     return !!apiKey && apiKey === appConfig.apiKey;
   }
 
@@ -27,6 +28,7 @@ export class AuthGuard implements CanActivate {
     const credentials = parseBasicAuth(request.headers['authorization']);
     if (!credentials) return false;
     const appConfig = this.config.getOrThrow<AppConfig>('app');
+
     return credentials.user === appConfig.basicAuthUser && credentials.password === appConfig.basicAuthPass;
   }
 }

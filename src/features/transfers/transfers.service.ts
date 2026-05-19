@@ -21,26 +21,26 @@ export class TransfersService {
     const validEvents: TransferEventRecord[] = [];
     const rejectedEvents: RejectedEvent[] = [];
 
-    for (let i = 0; i < dto.events.length; i++) {
-      const rawEventData = dto.events[i];
-      const eventDto = plainToInstance(TransferEventDto, rawEventData);
+    for (const [i, rawEvent] of dto.events.entries()) {
+      const rawEventId = rawEvent['event_id'];
+      const eventDto = plainToInstance(TransferEventDto, rawEvent);
       const errors = validateSync(eventDto, { skipMissingProperties: false });
 
       if (errors.length > 0) {
         rejectedEvents.push({
           index: i,
-          event_id: typeof rawEventData['event_id'] === 'string' ? rawEventData['event_id'] : `index-${i}`,
+          event_id: typeof rawEventId === 'string' ? rawEventId : undefined,
           errors: errors.flatMap((validationError) => Object.values(validationError.constraints ?? {})),
         });
       } else {
-        validEvents.push({
-          event_id: eventDto.event_id,
-          station_id: eventDto.station_id,
-          amount: eventDto.amount,
-          status: eventDto.status,
-          created_at: new Date(eventDto.created_at),
-        });
+        validEvents.push({ ...eventDto, created_at: new Date(eventDto.created_at) });
       }
+    }
+
+    if (validEvents.length === 0) {
+      this.logger.warn(`Batch rejected — all ${rejectedEvents.length} events failed validation`);
+
+      throw new BadRequestException({ inserted: 0, duplicates: 0, rejected: rejectedEvents });
     }
 
     const batchInsertResult = await this.store.insertBatch(validEvents);
@@ -49,10 +49,6 @@ export class TransfersService {
     this.logger.log(
       `Batch processed — inserted: ${result.inserted}, duplicates: ${result.duplicates}, rejected: ${result.rejected.length}`,
     );
-
-    if (result.inserted === 0 && result.duplicates === 0 && result.rejected.length > 0) {
-      throw new BadRequestException(result);
-    }
 
     return result;
   }

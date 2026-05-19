@@ -10,11 +10,11 @@ export class RejectedEventDto {
   index: number;
 
   @ApiProperty({
-    description: 'The event_id of the rejected event',
+    description: 'The event_id of the rejected event. Omitted when the submitted value was missing or not a string.',
     example: REJECTED_EVENT_EXAMPLE.event_id,
-    required: true,
+    required: false,
   })
-  event_id: string;
+  event_id?: string;
 
   @ApiProperty({
     description: 'Validation error messages for this event',

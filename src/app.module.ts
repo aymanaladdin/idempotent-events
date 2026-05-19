@@ -5,7 +5,6 @@ import { appConfig } from './config/app.config';
 import { validate } from './config/env.validation';
 import { CommonModule } from './common/common.module';
 import { HealthModule } from './infrastructure/health/health.module';
-import { UiModule } from './features/ui/ui.module';
 import { StorageModule } from './infrastructure/storage/storage.module';
 import { TransfersModule } from './features/transfers/transfers.module';
 import { StationsModule } from './features/stations/stations.module';
@@ -17,7 +16,6 @@ import { StationsModule } from './features/stations/stations.module';
     CommonModule,
     StorageModule,
     HealthModule,
-    UiModule,
     TransfersModule,
     StationsModule,
   ],

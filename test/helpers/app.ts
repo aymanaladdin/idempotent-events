@@ -10,10 +10,10 @@ export async function createTestApp(): Promise<INestApplication> {
   const app = moduleRef.createNestApplication();
 
   app.setGlobalPrefix('api', {
-    exclude: ['/ui/dashboard', '/reference', '/health', '/health/live', '/health/ready'],
+    exclude: ['/reference', '/health', '/health/live', '/health/ready'],
   });
   app.enableVersioning({ type: VersioningType.URI });
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: false, transform: true }));
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
 
   await app.init();
   return app;

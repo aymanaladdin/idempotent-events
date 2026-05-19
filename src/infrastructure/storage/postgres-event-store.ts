@@ -44,36 +44,21 @@ export class PostgresEventStore implements EventStore {
 
   async getStationSummary(stationId: string): Promise<StationSummary | null> {
     try {
-      const rows = await this.db
+      const [row] = await this.db
         .select({
-          status: transferEvents.status,
           count: sql<string>`count(*)`,
-          total: sql<string>`coalesce(sum(case when ${transferEvents.status} = ${APPROVED_STATUS} then ${transferEvents.amount}::numeric else 0 end), 0)`,
+          approved_total: sql<string>`coalesce(sum(case when ${transferEvents.status} = ${APPROVED_STATUS} then ${transferEvents.amount}::numeric else 0 end), 0)`,
         })
         .from(transferEvents)
-        .where(eq(transferEvents.station_id, stationId))
-        .groupBy(transferEvents.status);
+        .where(eq(transferEvents.station_id, stationId));
 
-      if (rows.length === 0) return null;
-
-      const eventsByStatus: Record<string, number> = {};
-      let eventsCount = 0;
-      let totalApprovedAmount = 0;
-
-      for (const statusRow of rows) {
-        const count = Number(statusRow.count);
-        eventsByStatus[statusRow.status] = count;
-        eventsCount += count;
-        if (statusRow.status === APPROVED_STATUS) {
-          totalApprovedAmount = Number(statusRow.total);
-        }
-      }
+      const eventsCount = Number(row?.count ?? 0);
+      if (eventsCount === 0) return null;
 
       return {
         station_id: stationId,
-        total_approved_amount: totalApprovedAmount,
+        total_approved_amount: Number(row.approved_total),
         events_count: eventsCount,
-        events_by_status: eventsByStatus,
       };
     } catch (error) {
       this.logger.error(`Failed to get summary for station ${stationId}`, (error as Error).stack);

@@ -22,7 +22,6 @@ export interface StationSummary {
   station_id: string;
   total_approved_amount: number;
   events_count: number;
-  events_by_status: Record<string, number>;
 }
 
 export const EVENT_STORE = Symbol('EVENT_STORE');

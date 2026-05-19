@@ -5,7 +5,7 @@ Duplicate `event_id`s are dropped using a single `INSERT … ON CONFLICT DO NOTH
 no application-level locks, and the guarantee holds across multiple app instances.
 A reconciliation endpoint returns per-station totals on demand.
 
-> **Highlights:** partial-accept validation · per-event error detail · `events_by_status` breakdown · Scalar OpenAPI docs · interactive demo UI · graceful pool shutdown · 22 integration tests
+> **Highlights:** partial-accept validation · per-event error detail · Scalar OpenAPI docs · graceful pool shutdown · integration tests
 
 ---
 
@@ -16,7 +16,7 @@ A reconciliation endpoint returns per-station totals on demand.
 ```bash
 docker compose up --build
 # API ready at http://localhost:3000
-# Demo UI at  http://localhost:3000/ui/dashboard  (admin / secret)
+# OpenAPI docs at http://localhost:3000/reference
 ```
 
 **Local:**
@@ -39,7 +39,6 @@ make run
 | Database | PostgreSQL 17 via Drizzle ORM |
 | Auth | Basic Auth · `x-api-key` header |
 | API Docs | Scalar (OpenAPI) at `/reference` |
-| Demo UI | Alpine.js + Tailwind at `/ui/dashboard` |
 
 **Requirements:** Node.js 20+ · PostgreSQL 16+ (or Docker)
 
@@ -74,7 +73,6 @@ docker compose up --build
 
 | URL | Service |
 |---|---|
-| `http://localhost:3000/ui/dashboard` | Demo UI — login: `admin` / `secret` |
 | `http://localhost:3000/reference` | Scalar OpenAPI docs |
 | `http://localhost:3000/health/live` | Liveness probe |
 | `http://localhost:3000/health/ready` | Readiness probe — checks DB connectivity |
@@ -89,14 +87,15 @@ make test           # local — requires a running Postgres instance
 make docker-test    # Docker — isolated test DB, no local Postgres needed
 ```
 
-22 integration tests covering:
+Integration tests cover:
 
 - Batch insert returns correct `inserted` / `duplicates` counts
 - Duplicate `event_id` is silently ignored — totals unchanged
 - Out-of-order arrival produces the correct summary
 - Concurrent POSTs with the same `event_id` never double-insert
 - Partial accept: valid events are inserted despite invalid siblings in the batch
-- Summary correctness per station (approved amount · event count · by-status breakdown)
+- Wholly-rejected batch returns `400` with the `rejected[]` payload
+- Summary correctness per station (approved amount · event count)
 
 ---
 
@@ -124,7 +123,6 @@ All API routes carry the prefix `/api/v1`. Auth, UI, and health routes are not v
 | `GET` | `/health/live` | — | Liveness probe |
 | `GET` | `/health/ready` | — | Readiness probe |
 | `GET` | `/reference` | — | Scalar OpenAPI docs |
-| `GET` | `/ui/dashboard` | Browser | Interactive demo UI |
 
 ---
 
@@ -213,11 +211,7 @@ curl http://localhost:3000/api/v1/stations/station-42/summary \
 {
   "station_id": "station-42",
   "total_approved_amount": 250.5,
-  "events_count": 3,
-  "events_by_status": {
-    "approved": 2,
-    "pending": 1
-  }
+  "events_count": 3
 }
 ```
 
@@ -291,6 +285,14 @@ This is chosen over **fail-fast** because it makes the endpoint safe to replay f
 pub/sub systems, or any retry mechanism — a single malformed event in a replayed batch will never
 block valid new events from being stored.
 
+**Status codes:**
+
+| Outcome | Status |
+|---|---|
+| At least one event was stored OR was a known duplicate | `201` with `{ inserted, duplicates, rejected }` |
+| Every event in the batch failed validation (nothing written, no duplicates) | `400` with `{ inserted: 0, duplicates: 0, rejected: [...] }` |
+| Request body shape itself is invalid (e.g. missing `events`, unknown top-level field) | `400` from the outer `ValidationPipe` |
+
 **Validation rules per event:**
 
 | Field | Rule |
@@ -338,6 +340,8 @@ src/
   config/             # env validation, app config
 ```
 
-The `EventStore` interface (`src/infrastructure/storage/event-store.interface.ts`) defines the persistence
-contract. Swapping to a different backend requires only a new class implementing that interface and updating
-the provider binding in `StorageModule` — no business logic changes.
+The `EventStore` interface (`src/infrastructure/storage/event-store.interface.ts`) is the persistence
+contract. The Postgres adapter is the only one shipped — but "swappable" means the *port* is sufficient:
+a new backend is a new class implementing `EventStore` plus one provider line in `StorageModule`. No
+business logic changes. The integration tests pin the contract end-to-end so any future adapter must
+preserve the same idempotency, concurrency, and reconciliation semantics.

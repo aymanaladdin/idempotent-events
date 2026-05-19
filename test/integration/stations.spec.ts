@@ -68,22 +68,6 @@ describe('Station summary', () => {
       expect(response.body.events_count).toBe(4);
     });
 
-    it('returns a per-status breakdown in events_by_status', async () => {
-      const stationId = uniqueStation();
-      await ingest([
-        buildTransferEvent({ station_id: stationId, status: 'approved' }),
-        buildTransferEvent({ station_id: stationId, status: 'approved' }),
-        buildTransferEvent({ station_id: stationId, status: 'pending' }),
-      ]);
-
-      const response = await request(app.getHttpServer())
-        .get(`/api/v1/stations/${stationId}/summary`)
-        .set(authHeader);
-
-      expect(response.status).toBe(200);
-      expect(response.body.events_by_status.approved).toBe(2);
-      expect(response.body.events_by_status.pending).toBe(1);
-    });
   });
 
   describe('given events arriving out of chronological order', () => {

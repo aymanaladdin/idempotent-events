@@ -22,13 +22,4 @@ export class StationSummaryDto {
     required: true,
   })
   events_count: number;
-
-  @ApiProperty({
-    description: 'Breakdown of event count per status — includes unknown statuses',
-    example: STATION_SUMMARY_EXAMPLE.events_by_status,
-    required: true,
-    type: 'object',
-    additionalProperties: { type: 'number' },
-  })
-  events_by_status: Record<string, number>;
 }

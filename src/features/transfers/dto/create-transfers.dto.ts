@@ -66,5 +66,8 @@ export class CreateTransfersDto {
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(1000)
+  // Loose type (not `TransferEventDto[]`) is intentional: the outer ValidationPipe would
+  // 400 the whole batch on any invalid event. TransfersService hand-validates each entry
+  // so failures route into `rejected[]` (partial-accept) instead of failing the request.
   events: Record<string, unknown>[];
 }

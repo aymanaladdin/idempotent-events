@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import {
@@ -44,11 +44,16 @@ export class TransfersService {
     }
 
     const batchInsertResult = await this.store.insertBatch(validEvents);
+    const result: InsertResult = { ...batchInsertResult, rejected: rejectedEvents };
 
     this.logger.log(
-      `Batch processed — inserted: ${batchInsertResult.inserted}, duplicates: ${batchInsertResult.duplicates}, rejected: ${rejectedEvents.length}`,
+      `Batch processed — inserted: ${result.inserted}, duplicates: ${result.duplicates}, rejected: ${result.rejected.length}`,
     );
 
-    return { ...batchInsertResult, rejected: rejectedEvents };
+    if (result.inserted === 0 && result.duplicates === 0 && result.rejected.length > 0) {
+      throw new BadRequestException(result);
+    }
+
+    return result;
   }
 }

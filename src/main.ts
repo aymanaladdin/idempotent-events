@@ -12,7 +12,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.setGlobalPrefix('api', {
-    exclude: ['/ui/dashboard', '/reference', '/health', '/health/live', '/health/ready'],
+    exclude: ['/reference', '/health', '/health/live', '/health/ready'],
   });
   app.enableVersioning({ type: VersioningType.URI });
 

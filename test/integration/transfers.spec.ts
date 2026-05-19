@@ -101,30 +101,40 @@ describe('Transfer ingestion', () => {
       expect(response.body.rejected[0].errors).toEqual(expect.arrayContaining([expect.any(String)]));
     });
 
-    it('rejects events with missing required fields into rejected[]', async () => {
+    it('returns 400 when the only event is missing required fields', async () => {
       const response = await ingest([{ amount: 100, status: 'approved' }]);
 
-      expect(response.status).toBe(201);
+      expect(response.status).toBe(400);
       expect(response.body.inserted).toBe(0);
       expect(response.body.rejected).toHaveLength(1);
       expect(response.body.rejected[0].index).toBe(0);
       expect(response.body.rejected[0].errors).toEqual(expect.arrayContaining([expect.any(String)]));
     });
 
-    it('rejects events with negative amount into rejected[]', async () => {
+    it('returns 400 when the only event has a negative amount', async () => {
       const response = await ingest([buildTransferEvent({ amount: -1 })]);
 
-      expect(response.status).toBe(201);
+      expect(response.status).toBe(400);
       expect(response.body.rejected).toHaveLength(1);
       expect(response.body.rejected[0].index).toBe(0);
     });
 
-    it('rejects events with invalid created_at into rejected[]', async () => {
+    it('returns 400 when the only event has an invalid created_at', async () => {
       const response = await ingest([buildTransferEvent({ created_at: 'not-a-date' })]);
 
-      expect(response.status).toBe(201);
+      expect(response.status).toBe(400);
       expect(response.body.rejected).toHaveLength(1);
       expect(response.body.rejected[0].index).toBe(0);
+    });
+
+    it('returns 400 with all errors when every event in a batch fails validation', async () => {
+      const response = await ingest([
+        { amount: 100, status: 'approved' },
+        buildTransferEvent({ amount: -1 }),
+      ]);
+
+      expect(response.status).toBe(400);
+      expect(response.body.rejected).toHaveLength(2);
     });
   });
 
@@ -134,6 +144,15 @@ describe('Transfer ingestion', () => {
         .post('/api/v1/transfers')
         .set(authHeader)
         .send({});
+
+      expect(response.status).toBe(400);
+    });
+
+    it('returns 400 when the request body has unknown top-level fields', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/transfers')
+        .set(authHeader)
+        .send({ events: [buildTransferEvent()], unexpected_field: 'x' });
 
       expect(response.status).toBe(400);
     });

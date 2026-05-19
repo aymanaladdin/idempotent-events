@@ -9,24 +9,15 @@ A reconciliation endpoint returns per-station totals on demand.
 
 ---
 
-## Quick Start
+## Non-Goals
 
-**Docker — everything in one command:**
+The following are intentionally **out of scope** for this take-home and called out so the surface area stays honest:
 
-```bash
-docker compose up --build
-# API ready at http://localhost:3000
-# OpenAPI docs at http://localhost:3000/reference
-```
-
-**Local:**
-
-```bash
-cp .env.example .env
-npm install
-npm run db:migrate
-make run
-```
+- **Cluster-wide rate limiting.** The throttler is per-instance — no Redis-backed counter, no API-gateway integration.
+- **JWT / OAuth / RBAC.** Auth is API-key + Basic only; there is no user/role model.
+- **Event mutation or correction.** Events are write-once via the primary key; there is no `PATCH /transfers/:id`.
+- **Persistent audit trail of rejected events.** Validation failures are returned in the response, not stored.
+- **Multi-tenancy.** Stations share a global namespace; there is no tenant isolation.
 
 ---
 
@@ -44,7 +35,114 @@ make run
 
 ---
 
-## Running Locally
+## How It Works
+
+### Idempotency
+
+`event_id` is the primary key of `transfer_events`. Every insert goes through Drizzle's `.onConflictDoNothing()`,
+which compiles to PostgreSQL's `INSERT … ON CONFLICT DO NOTHING`. Duplicates are silently skipped — never overwritten.
+
+```sql
+CREATE TABLE transfer_events (
+  event_id   TEXT                     PRIMARY KEY,   -- idempotency primitive
+  station_id TEXT                     NOT NULL,
+  amount     NUMERIC(20, 4)           NOT NULL,      -- decimal-safe; no float drift
+  status     TEXT                     NOT NULL,      -- only 'approved' counts toward totals
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE INDEX transfer_events_station_status_idx
+  ON transfer_events (station_id, status);           -- supports the summary query
+```
+
+This is preferred over a read-then-write check because it's a **single atomic round-trip** — no TOCTOU race
+exists between the existence check and the insert. Idempotency and concurrency safety come from the same
+primitive with no extra application logic.
+
+`DO NOTHING` is deliberate over `ON CONFLICT DO UPDATE`: on a conflict PostgreSQL discards the incoming row
+immediately after the index lookup — no heap write, no WAL entry, no new MVCC row version.
+`DO UPDATE` would write a row version on every duplicate, generating WAL traffic and accumulating dead tuples
+under high replay rates.
+
+### Concurrency
+
+Concurrency safety lives entirely at the database layer via the primary-key index. Two concurrent POSTs
+carrying the same `event_id` race to insert — PostgreSQL's index serializes the conflict and exactly one
+succeeds. No application-level locks, mutexes, or distributed coordination are needed. The guarantee is
+correct across multiple app instances without any coordination overhead.
+
+```mermaid
+sequenceDiagram
+    participant A as Client A
+    participant B as Client B
+    participant API as TransfersController
+    participant DB as Postgres
+
+    par concurrent POSTs with the same event_id
+        A->>API: POST /transfers (event_id = evt-X)
+        API->>DB: INSERT ... ON CONFLICT DO NOTHING
+    and
+        B->>API: POST /transfers (event_id = evt-X)
+        API->>DB: INSERT ... ON CONFLICT DO NOTHING
+    end
+
+    Note over DB: unique index on event_id<br/>serializes the two inserts<br/>exactly one row is written
+
+    DB-->>API: 1 row returned
+    DB-->>API: 0 rows returned
+    API-->>A: 201 { inserted: 1, duplicates: 0 }
+    API-->>B: 201 { inserted: 0, duplicates: 1 }
+```
+
+### Partial Accept
+
+The batch follows a **validate-first, bulk-insert** pipeline:
+
+1. Every event is validated individually by `class-validator` before any DB write.
+2. Valid events are bulk-inserted in a single `INSERT … ON CONFLICT DO NOTHING`.
+3. Invalid events are returned in `rejected[]` with their batch index and an error list.
+
+This is chosen over **fail-fast** because it makes the endpoint safe to replay from message queues,
+pub/sub systems, or any retry mechanism — a single malformed event in a replayed batch will never
+block valid new events from being stored.
+
+**Status codes:**
+
+| Outcome | Status |
+|---|---|
+| At least one event was stored OR was a known duplicate | `201` with `{ inserted, duplicates, rejected }` |
+| Every event failed validation (nothing written, no duplicates) | `400` with `{ inserted: 0, duplicates: 0, rejected: [...] }` |
+| Request body shape itself is invalid (e.g. missing `events`, unknown top-level field) | `400` from the outer `ValidationPipe` |
+
+**Validation rules per event:**
+
+| Field | Rule |
+|---|---|
+| `event_id`, `station_id`, `status`, `created_at` | Required non-empty strings |
+| `amount` | Required · non-negative number (`≥ 0`) |
+| `created_at` | Valid ISO 8601 date string |
+| `status` | Any string accepted · unknown values stored but excluded from `total_approved_amount` |
+| Batch size | 1 – 1 000 events per request |
+
+### `events_count` semantics
+
+`events_count` reflects **all stored events** for the station regardless of status.
+`total_approved_amount` sums only `status = 'approved'` events.
+This gives a complete audit picture and lets callers derive the approval rate directly.
+
+---
+
+## Quick Start
+
+**Docker — everything in one command:**
+
+```bash
+docker compose up --build
+# API ready at http://localhost:3000
+# OpenAPI docs at http://localhost:3000/reference
+```
+
+**Local:**
 
 ```bash
 cp .env.example .env      # copy environment template
@@ -53,7 +151,7 @@ npm run db:migrate        # apply migrations via drizzle-kit
 make run                  # start dev server with watch mode
 ```
 
-### Environment Variables
+### Environment variables
 
 | Variable | Description | Default |
 |---|---|---|
@@ -63,43 +161,7 @@ make run                  # start dev server with watch mode
 | `BASIC_AUTH_PASS` | Basic auth password | `secret` |
 | `PORT` | HTTP port | `3000` |
 
----
-
-## Running with Docker
-
-```bash
-docker compose up --build
-```
-
-| URL | Service |
-|---|---|
-| `http://localhost:3000/reference` | Scalar OpenAPI docs |
-| `http://localhost:3000/health/live` | Liveness probe |
-| `http://localhost:3000/health/ready` | Readiness probe — checks DB connectivity |
-| `http://localhost:5050` | pgAdmin — `admin@admin.com` / `admin` |
-
----
-
-## Tests
-
-```bash
-make test           # local — requires a running Postgres instance
-make docker-test    # Docker — isolated test DB, no local Postgres needed
-```
-
-Integration tests cover:
-
-- Batch insert returns correct `inserted` / `duplicates` counts
-- Duplicate `event_id` is silently ignored — totals unchanged
-- Out-of-order arrival produces the correct summary
-- Concurrent POSTs with the same `event_id` never double-insert
-- Partial accept: valid events are inserted despite invalid siblings in the batch
-- Wholly-rejected batch returns `400` with the `rejected[]` payload
-- Summary correctness per station (approved amount · event count)
-
----
-
-## Seed Demo Data
+### Seed demo data
 
 ```bash
 make seed           # local
@@ -112,7 +174,7 @@ Inserts 10 stations × 50 events each with randomised statuses (`approved` / `pe
 
 ## API
 
-All API routes carry the prefix `/api/v1`. Auth, UI, and health routes are not versioned.
+All API routes carry the prefix `/api/v1`. Auth and health routes are not versioned.
 
 ### Endpoints
 
@@ -123,8 +185,6 @@ All API routes carry the prefix `/api/v1`. Auth, UI, and health routes are not v
 | `GET` | `/health/live` | — | Liveness probe |
 | `GET` | `/health/ready` | — | Readiness probe |
 | `GET` | `/reference` | — | Scalar OpenAPI docs |
-
----
 
 ### POST /api/v1/transfers
 
@@ -198,8 +258,6 @@ curl -X POST http://localhost:3000/api/v1/transfers \
 }
 ```
 
----
-
 ### GET /api/v1/stations/:station_id/summary
 
 ```bash
@@ -214,8 +272,6 @@ curl http://localhost:3000/api/v1/stations/station-42/summary \
   "events_count": 3
 }
 ```
-
----
 
 ### Authentication
 
@@ -238,103 +294,62 @@ curl http://localhost:3000/health/ready   # 200 when DB reachable · 503 when do
 
 ---
 
-## Design Notes
+## Tests
 
-### Idempotency Strategy
+```bash
+make test           # local — requires a running Postgres instance
+make docker-test    # Docker — isolated test DB, no local Postgres needed
+```
 
-Each `event_id` has a `UNIQUE INDEX` on `transfer_events`. Inserts use Drizzle's `.onConflictDoNothing()`,
-which maps to PostgreSQL's `INSERT … ON CONFLICT DO NOTHING`. Duplicates are silently skipped — never overwritten.
+Integration tests cover:
 
-This is preferred over a read-then-write check because it is a **single atomic round-trip** — no TOCTOU race
-exists between the existence check and the insert. Idempotency and concurrency safety come from the same
-primitive with no extra application logic.
-
-`DO NOTHING` is deliberate over `ON CONFLICT DO UPDATE`: on a conflict PostgreSQL discards the incoming row
-immediately after the index lookup — no heap write, no WAL entry, no new MVCC row version.
-`DO UPDATE` would write a row version on every duplicate, generating WAL traffic and accumulating dead tuples
-under high replay rates.
-
-The response separates three distinct outcomes per batch:
-
-| Field | Meaning |
-|---|---|
-| `inserted` | New events written to the DB |
-| `duplicates` | Events already present — silently skipped |
-| `rejected` | Events that failed validation — never reached the DB |
+- Batch insert returns correct `inserted` / `duplicates` counts
+- Duplicate `event_id` is silently ignored — totals unchanged
+- Out-of-order arrival produces the correct summary
+- Concurrent POSTs with the same `event_id` never double-insert
+- Partial accept: valid events are inserted despite invalid siblings in the batch
+- Wholly-rejected batch returns `400` with the `rejected[]` payload
+- Summary correctness per station (approved amount · event count)
 
 ---
 
-### Concurrency Strategy
+## Failure Modes
 
-Concurrency safety lives entirely at the database layer via the unique index. Two concurrent POSTs carrying
-the same `event_id` race to insert — PostgreSQL's index serializes the conflict and exactly one succeeds.
-No application-level locks, mutexes, or distributed coordination are needed. The guarantee is correct
-across multiple app instances without any coordination overhead.
+Anticipated failures and the contract for each:
 
----
-
-### Partial Accept Strategy
-
-The batch follows a **validate-first, bulk-insert** pipeline:
-
-1. Every event is validated individually by `class-validator` before any DB write.
-2. Valid events are bulk-inserted in a single `INSERT … ON CONFLICT DO NOTHING`.
-3. Invalid events are returned in `rejected[]` with their batch index and an error list.
-
-This is chosen over **fail-fast** because it makes the endpoint safe to replay from message queues,
-pub/sub systems, or any retry mechanism — a single malformed event in a replayed batch will never
-block valid new events from being stored.
-
-**Status codes:**
-
-| Outcome | Status |
-|---|---|
-| At least one event was stored OR was a known duplicate | `201` with `{ inserted, duplicates, rejected }` |
-| Every event in the batch failed validation (nothing written, no duplicates) | `400` with `{ inserted: 0, duplicates: 0, rejected: [...] }` |
-| Request body shape itself is invalid (e.g. missing `events`, unknown top-level field) | `400` from the outer `ValidationPipe` |
-
-**Validation rules per event:**
-
-| Field | Rule |
-|---|---|
-| `event_id`, `station_id`, `status`, `created_at` | Required non-empty strings |
-| `amount` | Required · non-negative number (`≥ 0`) |
-| `created_at` | Valid ISO 8601 date string |
-| `status` | Any string accepted · unknown values stored but excluded from `total_approved_amount` |
-| Batch size | 1 – 1 000 events per request |
+| Scenario | Behavior | Caller action |
+|---|---|---|
+| DB unreachable | `/health/ready` → 503 · API writes → 500 | Retry with backoff |
+| Throttler tripped (> 100 req / min / instance) | 429 from `ThrottlerGuard` | Retry with exponential backoff |
+| Bulk-insert error mid-batch | Transaction rolls back — nothing stored | Retry whole batch · `ON CONFLICT DO NOTHING` keeps it idempotent |
+| Batch > 1 000 events or shape invalid | 400 from outer `ValidationPipe` | Split batch / fix shape |
+| All events in a batch fail validation | 400 with the `rejected[]` payload | Fix the events client-side |
+| Unknown `station_id` on summary | 404 | Verify the id; the station has never received an event |
+| Missing or invalid credentials | 401 from `AuthGuard` | Provide `x-api-key` or Basic credentials |
 
 ---
 
-### events_count Semantics
-
-`events_count` reflects **all stored events** for the station regardless of status.
-`total_approved_amount` sums only `status = 'approved'` events.
-This gives a complete audit picture and lets callers derive the approval rate directly.
-
----
-
-### Tradeoffs & Production Path
+## Tradeoffs & Production Path
 
 | Concern | Current | Production path |
 |---|---|---|
 | Rate limiting | `@nestjs/throttler` · per-instance | API Gateway (Kong / AWS API GW) for cluster-wide limits |
-| Dedup cache | DB unique index | Redis bloom filter as a fast-path before DB write at extreme write volume |
+| Dedup short-circuit | DB unique index | Redis `SET`-with-TTL populated *post-write* — on POST, look up `event_id` before the DB: hit → return `{duplicates: 1}` without a DB call; miss → normal DB path, then populate Redis on confirmed success. Never populate before confirmed write (would risk acking events that were never persisted). Helps only when replay-duplicate rate dominates ingest — measure first |
 | Storage | Postgres · `EventStore` interface | Swap adapter without touching business logic |
 | Auth | Basic Auth / API key | JWT + RBAC via an identity provider |
 | Migrations | Run at app startup | Separate CI/CD step or init container in production |
 
 ---
 
-### Project Structure
+## Project Structure
 
 ```
 src/
   features/
     transfers/        # POST /transfers — controller, service, DTOs
     stations/         # GET /stations/:id/summary — controller, service, DTOs
-    ui/               # /ui/dashboard — browser-auth guard, static serving
   infrastructure/
-    storage/          # EventStore port + PostgresEventStore adapter
+    storage/          # EventStore port + PostgresEventStore adapter + Drizzle schema
     health/           # /health/live + /health/ready
   common/             # parseBasicAuth helper, shared auth guard
   config/             # env validation, app config
